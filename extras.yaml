@@ -1,0 +1,67 @@
+---
+version: "2.1"
+
+services:
+
+  # subtitle management
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+    restart: unless-stopped
+    network_mode: "service:transmission"
+    volumes:
+      - /media/downloads:/downloads
+      - /media/media-server/bazarr/config:/config
+
+  # ebooks management
+  readarr:
+    image: lscr.io/linuxserver/readarr:develop
+    container_name: readarr
+    network_mode: "service:transmission"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+    volumes:
+      - /media/downloads:/downloads
+      - /media/media-server/readarr/data:/config
+    restart: unless-stopped
+
+  # ebook reader
+  ubooquity:
+    image: lscr.io/linuxserver/ubooquity:latest
+    container_name: ubooquity
+    network_mode: "service:transmission"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+      - MAXMEM=1024
+    volumes:
+      - /media/downloads:/downloads
+      - /media/media-server/ubooquity/config:/config
+    ports:
+      - 2202:2202
+      - 2203:2203
+    restart: unless-stopped
+
+  # cleaning service
+  cleanarr:
+    image: pemcconnell/cleanarr:latest
+    container_name: cleanarr
+    restart: unless-stopped
+    environment:
+      - BYPASS_SSL_VERIFY=1
+      - DEBUG=0
+    env_file:
+      - .env
+    volumes:
+      - /media/media-server/cleanarr/config:/config:rw
+      - /etc/localtime:/etc/localtime:ro
+    network_mode: "service:transmission"
+
+  

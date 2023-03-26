@@ -1,0 +1,116 @@
+---
+version: "2.1"
+
+services:
+
+  # download client
+  transmission:
+    image: haugene/transmission-openvpn:latest
+    container_name: transmission-openvpn
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    sysctls:
+      - "net.ipv6.conf.all.disable_ipv6=0"
+    ports:
+      - "9091:9091"  # transmission
+      - "8118:8118"  # transmission webproxy
+      - "7878:7878"  # radarr
+      - "8989:8989"  # sonarr
+      - "9117:9117"  # jackett
+      - "6767:6767"  # bazarr
+      - "8787:8787"  # readarr
+      - "5000:80"    # cleanarr
+      - "2202:2202"  # ubooquity
+      - "2203:2203"  # ubooquity
+    environment:
+      # see https://haugene.github.io/docker-transmission-openvpn/ for configuration options
+      - OPENVPN_PROVIDER=${VPN_PROVIDER:-NORDVPN}
+      - NORDVPN_COUNTRY=${NORDVPN_COUNTRY:-France}
+      - OPENVPN_USERNAME=${VPN_USERNAME}
+      - OPENVPN_PASSWORD=${VPN_PASSWORD}
+      - TRANSMISSION_WEB_HOME=/opt/transmission-ui/transmission-web-control
+      - TRANSMISSION_DOWNLOAD_DIR=/downloads/
+      - LOCAL_NETWORK=${LOCAL_NETWORK:-192.168.1.0/24,100.64.0.0/10,172.17.0.0/16}
+    env_file:
+      - .env
+    volumes:
+      - /media/downloads/:/downloads/:rw
+      - /media/media-server/transmission/data:/data:rw
+      - /media/media-server/transmission/config:/config:rw
+      - /etc/localtime:/etc/localtime:ro
+
+  # movie management
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    network_mode: "service:transmission"
+    env_file:
+      - .env
+    volumes:
+      - /media/downloads/:/downloads/:rw
+      - /media/media-server/plex/movies:/movies:rw
+      - /media/media-server/radarr/config/:/config/:rw
+      - /etc/localtime:/etc/localtime:ro
+
+  # tv show management
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    network_mode: "service:transmission"
+    env_file:
+      - .env
+    volumes:
+      - /media/downloads/:/downloads/:rw
+      - /media/media-server/sonarr/config:/config:rw
+      - /media/media-server/plex/tv:/tv:rw
+      - /media/media-server/transmission/completed:/downloads:rw
+      - /etc/localtime:/etc/localtime:ro
+
+  # indexer management
+  jackett:
+    image: linuxserver/jackett:latest
+    container_name: jackett
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /media/media-server/jackett/config:/config:rw
+      - /media/media-server/jackett/downloads:/downloads:rw
+      - /etc/localtime:/etc/localtime:ro
+    network_mode: "service:transmission"
+
+  # media server
+  plex:
+    image: plexinc/pms-docker:latest
+    container_name: plex
+    restart: unless-stopped
+    ports:
+      - "32400:32400"
+      - "1900:1900"
+      - "3005:3005"
+      - "5353:5353"
+      - "8324:8324"
+      - "32410:32410"
+      - "32412:32412"
+      - "32413:32413"
+      - "32414:32414"
+      - "32469:32469"
+      - "33400:33400"  # webtools plugin (https://github.com/ukdtom/WebTools.bundle/wiki/Install)
+    environment:
+      - "ADVERTISE_IP=http://192.168.1.208:32400/"
+    env_file:
+      - .env
+    volumes:
+      - /media/downloads/:/downloads/:rw
+      - /media/media-server/plex/config:/config:rw
+      - /etc/localtime:/etc/localtime:ro
+
+networks:
+  default:
+    name: plexnet
+    driver: bridge
